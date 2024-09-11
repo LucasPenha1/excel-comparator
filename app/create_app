@@ -1,0 +1,61 @@
+# /app.py
+from flask import Flask, request, render_template, jsonify
+import pandas as pd
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'file1' not in request.files or 'file2' not in request.files:
+        return "Please upload both files", 400
+    
+    file1 = request.files['file1']
+    file2 = request.files['file2']
+
+    # Load Excel files
+    excel1 = pd.ExcelFile(file1)
+    excel2 = pd.ExcelFile(file2)
+
+    # Get sheet names
+    sheets1 = excel1.sheet_names
+    sheets2 = excel2.sheet_names
+
+    return jsonify({'sheets1': sheets1, 'sheets2': sheets2})
+
+@app.route('/get_columns', methods=['POST'])
+def get_columns():
+    file = request.files['file']
+    sheet_name = request.form['sheet']
+
+    excel = pd.ExcelFile(file)
+    df = pd.read_excel(excel, sheet_name=sheet_name)
+
+    columns = df.columns.tolist()
+    return jsonify({'columns': columns})
+
+@app.route('/compare', methods=['POST'])
+def compare():
+    file1 = request.files['file1']
+    sheet1 = request.form['sheet1']
+    column1 = request.form['column1']
+
+    file2 = request.files['file2']
+    sheet2 = request.form['sheet2']
+    column2 = request.form['column2']
+
+    df1 = pd.read_excel(file1, sheet_name=sheet1)
+    df2 = pd.read_excel(file2, sheet_name=sheet2)
+
+    col1_values = set(df1[column1].dropna().astype(str))
+    col2_values = set(df2[column2].dropna().astype(str))
+
+    differences = col1_values - col2_values
+
+    return jsonify({'differences': list(differences)})
+
+if __name__ == '__main__':
+    app.run(debug=True)

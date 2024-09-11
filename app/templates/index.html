@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Comparator</title>
+</head>
+<body>
+    <h1>Excel Comparator</h1>
+
+    <!-- Formulário de upload -->
+    <form id="uploadForm">
+        <label for="file1">Upload Excel 1:</label>
+        <input type="file" id="file1" name="file1" required><br>
+
+        <label for="file2">Upload Excel 2:</label>
+        <input type="file" id="file2" name="file2" required><br>
+
+        <!-- Botão 1: Enviar os arquivos -->
+        <button type="button" id="uploadFilesButton">Enviar Arquivos</button><br>
+        
+        <!-- Área para seleção de abas -->
+        <div id="sheetSelection"></div>
+
+        <!-- Botão 2: Selecionar as abas -->
+        <button type="button" id="selectSheetsButton" disabled>Selecionar Abas</button><br>
+
+        <!-- Área para seleção de colunas -->
+        <div id="columnSelection"></div>
+
+        <!-- Botão 3: Comparar as colunas -->
+        <button type="button" id="compareButton" disabled>Comparar Colunas</button>
+    </form>
+
+    <!-- Resultados da comparação -->
+    <div id="results"></div>
+
+    <script>
+        // Função para enviar os arquivos e habilitar a seleção de abas
+        document.getElementById('uploadFilesButton').onclick = async function () {
+            console.log("Enviando arquivos...");
+            const formData = new FormData();
+            formData.append('file1', document.getElementById('file1').files[0]);
+            formData.append('file2', document.getElementById('file2').files[0]);
+
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                let sheetSelectionHtml = '';
+
+                // Gerar a seleção de abas para o Excel 1
+                sheetSelectionHtml += '<label for="sheet1">Select Sheet for Excel 1:</label>';
+                sheetSelectionHtml += '<select id="sheet1" name="sheet1">';
+                data.sheets1.forEach(sheet => {
+                    sheetSelectionHtml += `<option value="${sheet}">${sheet}</option>`;
+                });
+                sheetSelectionHtml += '</select><br>';
+
+                // Gerar a seleção de abas para o Excel 2
+                sheetSelectionHtml += '<label for="sheet2">Select Sheet for Excel 2:</label>';
+                sheetSelectionHtml += '<select id="sheet2" name="sheet2">';
+                data.sheets2.forEach(sheet => {
+                    sheetSelectionHtml += `<option value="${sheet}">${sheet}</option>`;
+                });
+                sheetSelectionHtml += '</select><br>';
+
+                document.getElementById('sheetSelection').innerHTML = sheetSelectionHtml;
+
+                // Habilitar o botão para selecionar abas
+                document.getElementById('selectSheetsButton').disabled = false;
+            } else {
+                alert('Falha ao enviar os arquivos. Tente novamente.');
+            }
+        };
+
+        // Função para selecionar as abas e habilitar a seleção de colunas
+        document.getElementById('selectSheetsButton').onclick = async function () {
+            const sheet1 = document.getElementById('sheet1').value;
+            const sheet2 = document.getElementById('sheet2').value;
+
+            if (sheet1 && sheet2) {
+                const formData1 = new FormData();
+                formData1.append('file', document.getElementById('file1').files[0]);
+                formData1.append('sheet', sheet1);
+
+                const formData2 = new FormData();
+                formData2.append('file', document.getElementById('file2').files[0]);
+                formData2.append('sheet', sheet2);
+
+                try {
+                    const [columns1, columns2] = await Promise.all([
+                        fetch('/get_columns', {
+                            method: 'POST',
+                            body: formData1
+                        }).then(response => response.json()),
+                        fetch('/get_columns', {
+                            method: 'POST',
+                            body: formData2
+                        }).then(response => response.json())
+                    ]);
+
+                    let columnSelectionHtml = '';
+
+                    columnSelectionHtml += '<label for="column1">Select Column for Excel 1:</label>';
+                    columnSelectionHtml += '<select id="column1" name="column1">';
+                    columns1.columns.forEach(column => {
+                        columnSelectionHtml += `<option value="${column}">${column}</option>`;
+                    });
+                    columnSelectionHtml += '</select><br>';
+
+                    columnSelectionHtml += '<label for="column2">Select Column for Excel 2:</label>';
+                    columnSelectionHtml += '<select id="column2" name="column2">';
+                    columns2.columns.forEach(column => {
+                        columnSelectionHtml += `<option value="${column}">${column}</option>`;
+                    });
+                    columnSelectionHtml += '</select><br>';
+
+                    document.getElementById('columnSelection').innerHTML = columnSelectionHtml;
+
+                    // Habilitar o botão para comparar
+                    document.getElementById('compareButton').disabled = false;
+                } catch (error) {
+                    console.error('Erro ao buscar colunas:', error);
+                    alert('Falha ao buscar colunas. Tente novamente.');
+                }
+            }
+        };
+
+        // Função para comparar as colunas
+        document.getElementById('compareButton').onclick = async function () {
+        console.log("Comparando colunas...");
+        const sheet1 = document.getElementById('sheet1').value;
+        const sheet2 = document.getElementById('sheet2').value;
+        const column1 = document.getElementById('column1').value;
+        const column2 = document.getElementById('column2').value;
+
+        const compareFormData = new FormData();
+        compareFormData.append('file1', document.getElementById('file1').files[0]);
+        compareFormData.append('sheet1', sheet1);
+        compareFormData.append('column1', column1);
+
+        compareFormData.append('file2', document.getElementById('file2').files[0]);
+        compareFormData.append('sheet2', sheet2);
+        compareFormData.append('column2', column2);
+
+        const compareResponse = await fetch('/compare', {
+        method: 'POST',
+        body: compareFormData
+        });
+
+        if (compareResponse.ok) {
+        const result = await compareResponse.json();
+
+        if (result.differences) {
+            document.getElementById('results').innerHTML = result.differences.join('<br>');
+        } else if (result.message) {
+            document.getElementById('results').innerHTML = result.message;
+        } else if (result.error) {
+            document.getElementById('results').innerHTML = result.error;
+        }
+        } else {
+        alert('Falha ao comparar as colunas.');
+        }
+    };  
+    </script>
+</body>
+</html>
